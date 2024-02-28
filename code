@@ -1,0 +1,124 @@
+org 0000H;	
+SJMP start
+		
+;standard cmd function for lcd	
+org 0003H
+	people_entry:
+    INC R2
+	LCALL DisplayVisiter
+	RETI
+   
+org 0013H
+	
+people_exit:	
+    MOV A,R2;check if R2=0
+	JZ skip
+		
+    DEC R2
+	LCALL DisplayVisiter
+  
+skip:
+	RETI
+
+	
+start:
+    LCALL SetupLcd
+	MOV TMOD,#01H;intialise delay mode 1 in timer 0,1ms
+	MOV TCON,#05H;edge trigger interupt
+    LCALL InitialDisplay
+	MOV R2,#00H;count total person
+	LCALL DisplayVisiter
+	MOV IE,#87H
+	SJMP loop
+	
+loop:
+    LJMP loop
+
+
+
+	
+SetupLcd:
+	MOV A,#38H;2 lines and 5×7 matrix
+	LCALL cmd
+	MOV A,#0CH;Display on, cursor off
+	LCALL cmd
+	MOV A,#01H;Clear display screen
+	LCALL cmd
+	MOV A,#80H;Force cursor to the beginning
+	LCALL cmd
+	RET
+
+InitialDisplay:
+   
+	MOV A,#01H
+	LCALL cmd
+	
+	MOV A,#80H;Force cursor to the beginning
+	LCALL cmd
+	
+	MOV R0,#00H
+	MOV DPTR,#str
+	MOV R7,#10H
+	LCALL display
+	
+	MOV A,#0C0H;second line
+	LCALL cmd
+	RET
+	
+	
+DisplayVisiter:
+    MOV A,#00H
+	MOV A,R2
+	CLR C
+	ADD A,#01H
+	CLR C
+	SUBB A,#01H
+    DA A;decimal adjust after add
+	MOV B,#10H
+	DIV AB
+	ADD A,#30H
+	LCALL send_data		
+	MOV A,B
+	ADD A,#30H
+	LCALL send_data	
+	MOV A,#0C0H;Force cursor to the beginning second line
+	LCALL cmd
+	RET	
+	
+send_data:
+    MOV P2,A
+	SETB P0.0;set rs pin to send data
+	CLR P0.1;r/w 0 for write
+	SETB P0.2;send content -> enable pin
+	CLR P0.2;after sending clr it
+	LCALL delay
+	RET
+	
+cmd:
+    MOV P2,A
+    CLR P0.0;rs pin
+	CLR P0.1;read and write pin
+	SETB P0.2;enable pin
+	CLR P0.2
+	LCALL delay
+	RET
+
+delay:
+      MOV TL0,#0F0H;
+      MOV TH0,#0D8H;
+	  SETB TCON.4;start timer
+wait:JNB TCON.5,wait
+      CLR TCON.4;
+      CLR TCON.5;
+      RET
+	  
+display:MOV A,R0
+        MOVC A,@A+DPTR
+		LCALL send_data
+		INC R0
+		DJNZ R7,display
+   		RET		  
+	
+str:DB' TOTAL PERSON ' 	
+	
+END	
